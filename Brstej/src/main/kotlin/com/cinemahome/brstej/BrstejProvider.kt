@@ -16,6 +16,7 @@ class BrstejProvider : MainAPI() {
 
     override val mainPage = mainPageOf(
         IRAQI to "مسلسلات عراقية",
+        ALL_SERIES to "كل المسلسلات",
         "ramdan2026" to "رمضان 2026",
         "arab8-2025" to "مسلسلات عربية",
         "5a7-2024" to "مسلسلات خليجية",
@@ -36,24 +37,45 @@ class BrstejProvider : MainAPI() {
             val items = IRAQI_TITLES.amap { search(it).firstOrNull() }.filterNotNull().distinctBy { it.name }
             return newHomePageResponse(request.name, items, false)
         }
-        val doc = app.get("$mainUrl/cat03.php?cat=${request.data}&page=$page").document
-        val items = cards(doc.select("a[href*=video.php][title]"))
+        if (request.data == ALL_SERIES) {
+            val items = seriesCards(app.get("$mainUrl/moslslat.php?page=$page").document)
+            return newHomePageResponse(request.name, items, items.isNotEmpty())
+        }
+        // A section page holds ~38 episodes of only 5-7 series, so each row step reads three pages.
+        val items = (3 * page - 2..3 * page).toList().amap { p ->
+            runCatching { cards(app.get("$mainUrl/cat03.php?cat=${request.data}&page=$p").document.select("a[href*=video.php]")) }
+                .getOrDefault(emptyList())
+        }.flatten().distinctBy { it.name }
         return newHomePageResponse(request.name, items, items.isNotEmpty())
     }
 
-    // The site's search wants the exact words it stored ("ليل البنفسج" finds nothing, "البنفسج" does), so when the
-    // whole phrase finds nothing, each word is tried from the longest down.
+    // Series first, from the series list's own search (moslslat.php?q=, which matches the full name). Then films and
+    // episodes from search.php; that one wants the exact words it stored ("ليل البنفسج" finds nothing, "البنفسج" does),
+    // so when the whole phrase finds nothing, each word is tried from the longest down.
     override suspend fun search(query: String): List<SearchResponse> {
-        val tries = listOf(query.trim()) + query.trim().split(Regex("\\s+")).filter { it.length > 2 }.sortedByDescending { it.length }
-        for (q in tries.distinct()) {
-            val found = cards(app.get("$mainUrl/search.php", params = mapOf("keywords" to q)).document.select("a[href*=video.php][title]"))
-            if (found.isNotEmpty()) {
-                val words = query.trim().split(Regex("\\s+"))
-                return found.sortedByDescending { r -> words.count { r.name.contains(it) } }
-            }
+        val q = query.trim()
+        val series = runCatching { seriesCards(app.get("$mainUrl/moslslat.php", params = mapOf("q" to q)).document) }
+            .getOrDefault(emptyList())
+        var others = emptyList<SearchResponse>()
+        val tries = listOf(q) + q.split(Regex("\\s+")).filter { it.length > 2 }.sortedByDescending { it.length }
+        for (t in tries.distinct()) {
+            others = runCatching { cards(app.get("$mainUrl/search.php", params = mapOf("keywords" to t)).document.select("a[href*=video.php]")) }
+                .getOrDefault(emptyList())
+            if (others.isNotEmpty()) break
         }
-        return emptyList()
+        val words = q.split(Regex("\\s+"))
+        val seriesNames = series.map { it.name }.toSet()
+        return series + others.filter { it.name !in seriesNames }.sortedByDescending { r -> words.count { r.name.contains(it) } }
     }
+
+    private fun seriesCards(doc: org.jsoup.nodes.Document): List<SearchResponse> =
+        doc.select("article.psd-card").mapNotNull { card ->
+            val a = card.selectFirst("h3 a[href*=series1.php]") ?: return@mapNotNull null
+            val name = cleanTitle(a.text())
+            newTvSeriesSearchResponse(name, a.attr("abs:href"), TvType.TvSeries) {
+                posterUrl = card.selectFirst("img")?.attr("abs:src")
+            }
+        }.distinctBy { it.name }
 
     override suspend fun load(url: String): LoadResponse {
         val seriesUrl: String?
@@ -120,10 +142,12 @@ class BrstejProvider : MainAPI() {
         return servers.isNotEmpty()
     }
 
+    // Section pages put the name in the link's title; search results put it in the link text, with the picture in a
+    // separate link of the same card.
     private fun cards(links: List<Element>): List<SearchResponse> = links.mapNotNull { a ->
-        val title = a.attr("title").trim()
-        if (title.isEmpty()) return@mapNotNull null
-        val image = a.selectFirst("img")?.attr("abs:src")
+        val title = a.attr("title").trim().ifEmpty { a.text().trim() }
+        if (title.isEmpty() || !title.contains(Regex("[\\p{L}]{2}"))) return@mapNotNull null
+        val image = (a.selectFirst("img") ?: a.closest("article, .thumbnail, li")?.selectFirst("img"))?.attr("abs:src")
         val name = cleanTitle(title)
         if (title.contains("فيلم") && !title.contains("الحلقة")) {
             newMovieSearchResponse(name, a.attr("abs:href"), TvType.Movie) { posterUrl = image }
@@ -134,6 +158,7 @@ class BrstejProvider : MainAPI() {
 
     companion object {
         private const val IRAQI = "iraqi"
+        private const val ALL_SERIES = "all-series"
 
         // The site has no Iraqi section, so this row is made from names. Add titles here as they come out.
         val IRAQI_TITLES = listOf("ليل البنفسج")

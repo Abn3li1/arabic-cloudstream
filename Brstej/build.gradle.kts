@@ -1,5 +1,5 @@
 // Raise this whenever the provider changes: CloudStream updates installs whose version is lower.
-version = 1
+version = 2
 
 cloudstream {
     description = "برستيج: مسلسلات عربية وعراقية وخليجية وشامية ومصرية وتركية وآسيوية، وأفلام وبرامج"
