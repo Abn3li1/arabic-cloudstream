@@ -1,10 +1,12 @@
 # CinemaHome عربي (CloudStream extensions)
 
-Two CloudStream extensions for Arabic content. They run on the viewer's device; no server and no TMDB.
+CloudStream extensions for Arabic content. They run on the viewer's device; no server and no TMDB.
 
 | Extension | Site | Rows |
 |---|---|---|
 | `MovizLand` | moviz.land (WordPress) | عراقي، رمضان 2026، عربي، مصري، تركي مترجم/مدبلج، كوري، آسيوي، أفلام عربية/تركية/كورية/آسيوية/أجنبية |
+| `Alooytv` | AloyTV | قنوات ومحتوى AloyTV. By Abodabodd ([re-3arabi](https://github.com/Abodabodd/re-3arabi)), copied with his permission |
+| `Youtube` | YouTube | يوتيوب، مع تسجيل دخول اختياري من الإعدادات. By Abodabodd ([re-3arabi](https://github.com/Abodabodd/re-3arabi)), copied with his permission |
 | `Brstej` | brstej1.com (برستيج) | عراقي، رمضان 2026، عربي، خليجي، شامي، مصري، تركي، آسيوي وكوري، برامج، أفلام |
 
 Install in CloudStream: Settings → Extensions → Add repository →
