@@ -1,0 +1,8 @@
+{
+  "name": "CinemaHome عربي",
+  "description": "مسلسلات وأفلام عربية وعراقية وتركية وكورية من MovizLand وبرستيج",
+  "manifestVersion": 1,
+  "pluginLists": [
+    "https://raw.githubusercontent.com/Abn3li1/arabic-cloudstream/builds/plugins.json"
+  ]
+}
